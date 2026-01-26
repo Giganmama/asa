@@ -1,23 +1,58 @@
+# task0
+#
+# Условие:
+# Дан ориентированный ациклический граф G = (V, E), где:
+#   V -- множество вершин графа,
+#   E -- множество рёбер графа.
+#
+# Каждое ребро ei принадлежит E и описывается парой (vj, vk), где:
+#   vj, vk принадлежит V -- вершины графа.
+#
+# Граф задаётся в виде CSV-файла. Каждая строка файла соответствует одному ребру:
+#   начальная вершина, конечная вершина
+#
+# Пример входных данных (graph.csv):
+# 1,2
+# 1,3
+# 3,4
+# 3,5
+#
+# Задача:
+# 1. Написать функцию
+#       def main(csv_graph: str) -> list[list[int]]]:
+#          ...
+#    где csv_graph -- строка (содержимое CSV-файла).
+#
+# 2. Функция должна возвращать матрицу смежности графа в виде списка списков list[list].
+#    - Размер матрицы: n x n, где n = |V| (количество вершин графа).
+#    - Элемент matrix[i][j] равен 1, если существует ребро из вершины i в вершину j, и 0, если ребра нет.
+#
+# Ожидаемый результат:
+#  [[0, 1, 1, 0, 0],
+#   [1, 0, 0, 0, 0],
+#   [1, 0, 0, 1, 1],
+#   [0, 0, 1, 0, 0],
+#   [0, 0, 1, 0, 0]]
 
-import csv
-from io import StringIO
-
-def main(csv_string):
-    reader = csv.reader(StringIO(csv_string), delimiter=',')
+def main(csv_graph: str) -> list[list[int]]:
     edges = []
-    header_skipped = False
-    for row in reader:
-        if not header_skipped:
-            header_skipped = True
-            continue
-        edges.append((int(row[0]), int(row[1])))
-    nodes = set()
+    vertices = set()
+
+    for line in csv_graph.strip().splitlines():
+        u, v = map(int, line.split(','))
+        edges.append((u, v))
+        vertices.add(u)
+        vertices.add(v)
+
+    vertices = sorted(vertices)
+    index = {v: i for i, v in enumerate(vertices)}
+    n = len(vertices)
+
+    matrix = [[0] * n for _ in range(n)]
+
     for u, v in edges:
-        nodes.add(u)
-        nodes.add(v)
-    n = max(nodes)
-    matrix = [[0]*n for _ in range(n)]
-    for u, v in edges:
-        matrix[u-1][v-1] = 1
-        matrix[v-1][u-1] = 1
+        i, j = index[u], index[v]
+        matrix[i][j] = 1
+        matrix[j][i] = 1
+
     return matrix
