@@ -1,74 +1,70 @@
-from typing import Tuple, List
-import math
+import json
+from typing import List, Union
 
-def build_relations(s: str):
-    edges = []
-    vertices = set()
-
-    for line in s.strip().splitlines():
-        u, v = map(int, line.split(','))
-        edges.append((u, v))
-        vertices.add(u)
-        vertices.add(v)
-
-    vertices = sorted(vertices)
-    idx = {v: i for i, v in enumerate(vertices)}
-    n = len(vertices)
-
-    parent = {v: None for v in vertices}
-    children = {v: [] for v in vertices}
-
-    for u, v in edges:
-        parent[v] = u
-        children[u].append(v)
-
-    def empty():
-        return [[False] * n for _ in range(n)]
-
-    r1 = empty()
-    r2 = empty()
-    r3 = empty()
-    r4 = empty()
-    r5 = empty()
-
-    for u, v in edges:
-        r1[idx[u]][idx[v]] = True
-        r2[idx[v]][idx[u]] = True
-
-    for v in vertices:
-        cur = parent[v]
-        while cur is not None:
-            if parent[v] != cur:
-                r3[idx[cur]][idx[v]] = True
-                r4[idx[v]][idx[cur]] = True
-            cur = parent[cur]
-
-    for p, ch in children.items():
-        for i in ch:
-            for j in ch:
-                if i != j:
-                    r5[idx[i]][idx[j]] = True
-
-    return [r1, r2, r3, r4, r5]
+Item = Union[int, str]
+Cluster = List[Item]
+Ranking = List[Union[Item, Cluster]]
 
 
-def main(s: str, e: str) -> Tuple[float, float]:
-    relations = build_relations(s)
-    n = len(relations[0])
-    k = len(relations)
+def normalize(r: Ranking) -> List[Cluster]:
 
-    H = 0.0
-    denom = n - 1
+    res = []
+    for x in r:
+        if isinstance(x, list):
+            res.append([str(i) for i in x])
+        else:
+            res.append([str(x)])
+    return res
 
-    for r in relations:
-        for i in range(n):
-            lij = sum(r[i])
-            if lij == 0:
+
+def build_matrix(clusters: List[Cluster]) -> dict:
+
+    items = [i for c in clusters for i in c]
+    pos = {}
+    for idx, c in enumerate(clusters):
+        for x in c:
+            pos[x] = idx
+
+    Y = {}
+    for i in items:
+        for j in items:
+            Y[(i, j)] = 1 if pos[i] >= pos[j] else 0
+    return Y, items
+
+
+def main(a_json: str, b_json: str):
+    A = normalize(json.loads(a_json))
+    B = normalize(json.loads(b_json))
+
+    YA, items = build_matrix(A)
+    YB, _ = build_matrix(B)
+
+    contradictions = []
+    for i in items:
+        for j in items:
+            if i == j:
                 continue
-            p = lij / denom
-            H += -p * math.log2(p)
+            if YA[(i, j)] == 0 and YB[(j, i)] == 0:
+                pair = sorted([i, j])
+                if pair not in contradictions:
+                    contradictions.append(pair)
 
-    c = 1 / (math.e * math.log(2))
-    H_ref = c * n * k
+    clusters = [{i} for i in items]
+    for i, j in contradictions:
+        ci = next(c for c in clusters if i in c)
+        cj = next(c for c in clusters if j in c)
+        if ci is not cj:
+            ci |= cj
+            clusters.remove(cj)
 
-    return round(H, 1), round(H / H_ref, 1)
+    order = {x: idx for idx, c in enumerate(A) for x in c}
+    clusters.sort(key=lambda c: min(order[x] for x in c))
+
+    result = []
+    for c in clusters:
+        if len(c) == 1:
+            result.append(int(next(iter(c))))
+        else:
+            result.append(sorted(int(x) for x in c))
+
+    return result
