@@ -1,69 +1,61 @@
 from typing import List, Tuple
-from collections import deque
 
 def main(s: str, e: str) -> Tuple[
     List[List[bool]],
     List[List[bool]],
     List[List[bool]],
     List[List[bool]],
-    List[List[bool]]
+    List[List[bool]],
 ]:
-    # Разберём входную строку в ребра графа
-    edges = [tuple(map(int, line.split(','))) for line in s.strip().split('\n')]
-    nodes = set()
+    edges = []
+    vertices = set()
+
+    for line in s.strip().splitlines():
+        u, v = map(int, line.split(','))
+        edges.append((u, v))
+        vertices.add(u)
+        vertices.add(v)
+
+    vertices = sorted(vertices)
+    idx = {v: i for i, v in enumerate(vertices)}
+    n = len(vertices)
+
+    parent = {v: None for v in vertices}
+    children = {v: [] for v in vertices}
+
     for u, v in edges:
-        nodes.add(u)
-        nodes.add(v)
-    n = max(nodes)
-    # Инициализация всех матриц n x n
-    r1 = [[False]*n for _ in range(n)]  # непосредственное управление
-    r2 = [[False]*n for _ in range(n)]  # непосредственное подчинение
-    r3 = [[False]*n for _ in range(n)]  # опосредованное управление
-    r4 = [[False]*n for _ in range(n)]  # опосредованное подчинение
-    r5 = [[False]*n for _ in range(n)]  # соподчинение
+        parent[v] = u
+        children[u].append(v)
 
-    # Строим дерево и находим родителей для каждого узла, а также уровни
-    tree = [[] for _ in range(n)]
-    parents = [None] * n
-    level = [None] * n
+    def empty():
+        return [[False] * n for _ in range(n)]
+
+    r1 = empty()  # непосредственное управление
+    r2 = empty()  # непосредственное подчинение
+    r3 = empty()  # опосредованное управление
+    r4 = empty()  # опосредованное подчинение
+    r5 = empty()  # соподчинение
+
+    # r1, r2
     for u, v in edges:
-        tree[u-1].append(v-1)
-        parents[v-1] = u-1
+        i, j = idx[u], idx[v]
+        r1[i][j] = True
+        r2[j][i] = True
 
-    # Найти уровни узлов и потомков каждого узла
-    root = int(e)-1
-    level[root] = 0
-    queue = deque([root])
-    while queue:
-        cur = queue.popleft()
-        for child in tree[cur]:
-            level[child] = level[cur]+1
-            queue.append(child)
+    # r3, r4
+    for v in vertices:
+        cur = parent[v]
+        while cur is not None:
+            if parent[v] != cur:
+                r3[idx[cur]][idx[v]] = True
+                r4[idx[v]][idx[cur]] = True
+            cur = parent[cur]
 
-    # Заполняем r1 и r2 (непосредственные связи)
-    for u, v in edges:
-        r1[u-1][v-1] = True
-        r2[v-1][u-1] = True
+    # r5
+    for p, childs in children.items():
+        for i in childs:
+            for j in childs:
+                if i != j:
+                    r5[idx[i]][idx[j]] = True
 
-    # Предварительно считаем всех предков (для опосредованных)
-    ancestors = [set() for _ in range(n)]
-    for v in range(n):
-        cur = v
-        while parents[cur] is not None:
-            ancestors[v].add(parents[cur])
-            cur = parents[cur]
-
-    # Заполняем r3 и r4 (опосредованные)
-    for v in range(n):
-        for anc in ancestors[v]:
-            if not r1[anc][v]:
-                r3[anc][v] = True  # опосредованное управление
-                r4[v][anc] = True  # опосредованное подчинение
-
-    # Для r5 (соподчинение): общие непосредственные родители
-    for i in range(n):
-        for j in range(n):
-            if i != j and parents[i] is not None and parents[j] is not None and parents[i] == parents[j]:
-                r5[i][j] = True
-
-    return (r1, r2, r3, r4, r5)
+    return r1, r2, r3, r4, r5

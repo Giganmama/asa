@@ -1,91 +1,74 @@
-from typing import Tuple
+from typing import Tuple, List
 import math
 
-def task(s: str, e: str) -> Tuple[float, float]:
-    edges = [tuple(map(int, line.strip().split(','))) for line in s.strip().split('
-')]
-    elements = set()
+def build_relations(s: str):
+    edges = []
+    vertices = set()
+
+    for line in s.strip().splitlines():
+        u, v = map(int, line.split(','))
+        edges.append((u, v))
+        vertices.add(u)
+        vertices.add(v)
+
+    vertices = sorted(vertices)
+    idx = {v: i for i, v in enumerate(vertices)}
+    n = len(vertices)
+
+    parent = {v: None for v in vertices}
+    children = {v: [] for v in vertices}
+
     for u, v in edges:
-        elements.add(u)
-        elements.add(v)
-    elements = sorted(list(elements))
-    n = len(elements)
+        parent[v] = u
+        children[u].append(v)
 
-    r1 = set(edges)
-    r2 = set((v, u) for u, v in edges)
+    def empty():
+        return [[False] * n for _ in range(n)]
 
-    from collections import defaultdict, deque
+    r1 = empty()
+    r2 = empty()
+    r3 = empty()
+    r4 = empty()
+    r5 = empty()
 
-    graph = defaultdict(list)
     for u, v in edges:
-        graph[u].append(v)
+        r1[idx[u]][idx[v]] = True
+        r2[idx[v]][idx[u]] = True
 
-    node_level = {}
-    root = int(e)
-    queue = deque()
-    queue.append((root, 0))
-    node_level[root] = 0
-    while queue:
-        node, lvl = queue.popleft()
-        node_level[node] = lvl
-        for nei in graph.get(node, []):
-            if nei not in node_level:
-                queue.append((nei, lvl + 1))
+    for v in vertices:
+        cur = parent[v]
+        while cur is not None:
+            if parent[v] != cur:
+                r3[idx[cur]][idx[v]] = True
+                r4[idx[v]][idx[cur]] = True
+            cur = parent[cur]
 
-    def descendants(node):
-        desc = set()
-        stack = [node]
-        while stack:
-            curr = stack.pop()
-            for nei in graph.get(curr, []):
-                if nei not in desc:
-                    desc.add(nei)
-                    stack.append(nei)
-        desc -= set(graph.get(node, []))  
-        return desc
+    for p, ch in children.items():
+        for i in ch:
+            for j in ch:
+                if i != j:
+                    r5[idx[i]][idx[j]] = True
 
-    r3 = set()
-    for u in elements:
-        for v in descendants(u):
-            r3.add((u, v))
-    
-    r4 = set((v, u) for (u, v) in r3)
+    return [r1, r2, r3, r4, r5]
 
-    r5 = set()
-    level_groups = defaultdict(list)
-    for node, lvl in node_level.items():
-        level_groups[lvl].append(node)
-    for group in level_groups.values():
-        for i in range(len(group)):
-            for j in range(i + 1, len(group)):
-                r5.add((group[i], group[j]))
-                r5.add((group[j], group[i]))
 
-    relations = [r1, r2, r3, r4, r5]
+def main(s: str, e: str) -> Tuple[float, float]:
+    relations = build_relations(s)
+    n = len(relations[0])
     k = len(relations)
-    
-    l = {mj: [0]*k for mj in elements}
-    for rel_idx, rel in enumerate(relations):
-        for (u, v) in rel:
-            l[u][rel_idx] += 1
 
-    entropies = {}
-    max_links = n - 1   
-    for mj in elements:
-        Hm = 0
-        for rel_idx in range(k):
-            lij = l[mj][rel_idx]
+    H = 0.0
+    denom = n - 1
+
+    for r in relations:
+        for i in range(n):
+            lij = sum(r[i])
             if lij == 0:
                 continue
-            P = lij / max_links
-            H = -P * math.log2(P)
-            Hm += H
-        entropies[mj] = Hm
-
-    H_total = sum(entropies.values())
+            p = lij / denom
+            H += -p * math.log2(p)
 
     c = 1 / (math.e * math.log(2))
     H_ref = c * n * k
 
-    h_norm = H_total / H_ref if H_ref > 0 else 0
-    return (round(H_total, 1), round(h_norm, 2))
+    return round(H, 1), round(H / H_ref, 1)
